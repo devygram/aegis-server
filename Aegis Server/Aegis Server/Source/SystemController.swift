@@ -154,6 +154,7 @@ final class SystemController: ObservableObject {
     // MARK: - Updates (network is used only when the user clicks the button)
 
     @Published var updateStatus = ""
+    @Published var updateAvailable = false
 
     func checkForUpdates(autoOpen: Bool = true) {
         Task {
@@ -168,13 +169,15 @@ final class SystemController: ObservableObject {
                 }
                 let current = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
                 if isNewer(tag, than: current) {
+                    updateAvailable = true
                     if autoOpen {
                         updateStatus = "New version \(tag) — opening the download page…"
                         NSWorkspace.shared.open(URL(string: html)!)
                     } else {
-                        updateStatus = "Update available: \(tag) — click Check for Updates"
+                        updateStatus = "Update available: \(tag) — click Update Now"
                     }
                 } else {
+                    updateAvailable = false
                     updateStatus = "You're up to date (v\(current))."
                 }
             } catch {

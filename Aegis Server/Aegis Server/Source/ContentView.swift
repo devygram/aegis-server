@@ -51,10 +51,10 @@ struct ContentView: View {
             Divider()
 
             HStack {
-                Button("Check for Updates") { sys.checkForUpdates() }
+                Button(sys.updateAvailable ? "Update Now" : "Check for Updates") { sys.checkForUpdates() }
                     .buttonStyle(.plain)
                     .font(.callout)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(sys.updateAvailable ? .green : .primary)
                 if !sys.updateStatus.isEmpty {
                     Text(sys.updateStatus)
                         .font(.caption2)
