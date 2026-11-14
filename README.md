@@ -35,10 +35,10 @@ Extra niceties:
 
 ## Build it yourself
 
-Requires **macOS 13+** and **Xcode 26+** (the project uses Xcode's new project format).
+Requires **macOS 13+** and **Xcode**.
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/aegis-server.git
+git clone https://github.com/devygram/aegis-server.git
 cd aegis-server/Aegis\ Server
 xcodebuild -project "Aegis Server.xcodeproj" -scheme "Aegis Server" -configuration Release build
 # the app appears in:
@@ -56,8 +56,9 @@ Or just open `Aegis Server.xcodeproj` in Xcode and press ⌘R.
 
 ## Roadmap
 
-- [ ] v1.1: Wi-Fi watchdog — auto-reconnect if Wi-Fi drops while the lid is closed
-- [ ] Battery indicator inside the window
+- [x] v1.1: Wi-Fi watchdog — auto-reconnect if Wi-Fi drops while the lid is closed
+- [x] v1.3: green "Update Now" button when a new release is out
+- [x] v1.4: one-click self-update (download → install → relaunch)
 - [ ] Optional "keep awake until" timer
 
 ## Updates
@@ -68,7 +69,7 @@ The app checks GitHub quietly at launch. When a new version appears, the button 
 ## Privacy
 
 The app **never** connects to the internet on its own and never collects anything — everything runs locally on your Mac.
-The only network request it ever makes is when **you** click **Check for Updates**, which asks GitHub's API for the latest release.
+The only network requests it ever makes are the update check at launch and the download when **you** click **Update Now**.
 
 ## License
 
