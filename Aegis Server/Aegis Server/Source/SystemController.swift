@@ -174,7 +174,7 @@ final class SystemController: ObservableObject {
                         updateStatus = "New version \(tag) — opening the download page…"
                         NSWorkspace.shared.open(URL(string: html)!)
                     } else {
-                        updateStatus = "Update available: \(tag) — click Update Now"
+                        updateStatus = "New version \(tag) available."
                     }
                 } else {
                     updateAvailable = false
