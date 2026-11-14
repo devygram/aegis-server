@@ -226,18 +226,25 @@ final class SystemController: ObservableObject {
         }
     }
 
-    // Called on quit: undoes every system change the app is responsible for,
-    // so a Mac that was kept awake goes back to normal sleep behavior.
+    // Called on quit: releases the sleep/Wi-Fi state that is currently on —
+    // checked against the real system, so settings can never outlive the app.
     nonisolated static func cleanupOnQuit() {
         let d = UserDefaults.standard
-        if d.bool(forKey: "sleepSet") {
+        let (out, _) = run("/usr/bin/pmset", ["-g"])
+        func isOn(_ key: String) -> Bool {
+            guard let line = out.split(separator: "\n").first(where: {
+                $0.range(of: key, options: .caseInsensitive) != nil
+            }), let v = line.split(whereSeparator: \.isWhitespace).last else { return false }
+            return v == "1"
+        }
+        if isOn("SleepDisabled") {
             _ = run("/usr/bin/sudo", ["-n", "/usr/bin/pmset", "-a", "disablesleep", "0"])
-            d.removeObject(forKey: "sleepSet")
         }
-        if d.bool(forKey: "wifiSet") {
+        if isOn("networkoversleep") {
             _ = run("/usr/bin/sudo", ["-n", "/usr/bin/pmset", "-a", "networkoversleep", "0"])
-            d.removeObject(forKey: "wifiSet")
         }
+        d.removeObject(forKey: "sleepSet")
+        d.removeObject(forKey: "wifiSet")
         if let pid = d.object(forKey: "caffeinatePID") as? Int32 {
             kill(pid, SIGTERM)
             d.removeObject(forKey: "caffeinatePID")
