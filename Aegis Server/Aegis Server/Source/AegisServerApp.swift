@@ -4,7 +4,7 @@ import SwiftUI
 @main
 struct AegisServerApp: App {
     var body: some Scene {
-        MenuBarExtra("Aegis Server", systemImage: "server.rack") {
+        MenuBarExtra("Aegis Server", image: "MenuBarIcon") {
             ContentView()
         }
         .menuBarExtraStyle(.window)

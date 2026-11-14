@@ -209,7 +209,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dheddimak.aegisserver;
 				PRODUCT_NAME = "Aegis Server";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -236,7 +236,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dheddimak.aegisserver;
 				PRODUCT_NAME = "Aegis Server";
 				SWIFT_EMIT_LOC_STRINGS = YES;
