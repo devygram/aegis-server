@@ -62,7 +62,8 @@ Or just open `Aegis Server.xcodeproj` in Xcode and press ⌘R.
 
 ## Privacy
 
-The app **never** connects to the internet, never collects anything, and runs everything locally on your Mac.
+The app **never** connects to the internet on its own and never collects anything — everything runs locally on your Mac.
+The only network request it ever makes is when **you** click **Check for Updates**, which asks GitHub's API for the latest release.
 
 ## License
 

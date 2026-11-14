@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import Combine
 
 // Runs every shell command (pmset, networksetup, caffeinate) and publishes the results to the UI.
@@ -137,6 +138,48 @@ final class SystemController: ObservableObject {
         let (batt, _) = Self.run("/usr/bin/pmset", ["-g", "batt"])
         onBattery = !batt.contains("AC Power")
         if wifiAlwaysOn && watchdogTask == nil { startWatchdog() }
+    }
+
+    // MARK: - Updates (network is used only when the user clicks the button)
+
+    @Published var updateStatus = ""
+
+    func checkForUpdates() {
+        Task {
+            updateStatus = "Checking…"
+            let url = URL(string: "https://api.github.com/repos/devygram/aegis-server/releases/latest")!
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                guard let tag = obj?["tag_name"] as? String, let html = obj?["html_url"] as? String else {
+                    updateStatus = "Could not read the release page."
+                    return
+                }
+                let current = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
+                if isNewer(tag, than: current) {
+                    updateStatus = "New version \(tag) — opening the download page…"
+                    NSWorkspace.shared.open(URL(string: html)!)
+                } else {
+                    updateStatus = "You're up to date (v\(current))."
+                }
+            } catch {
+                updateStatus = "Could not check (offline?)."
+            }
+        }
+    }
+
+    // Compares "v1.2.1" style tags numerically.
+    private func isNewer(_ tag: String, than current: String) -> Bool {
+        func nums(_ s: String) -> [Int] {
+            s.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
+                .split(separator: ".").map { Int($0) ?? 0 }
+        }
+        let a = nums(tag), b = nums(current)
+        for i in 0..<max(a.count, b.count) {
+            let x = i < a.count ? a[i] : 0, y = i < b.count ? b[i] : 0
+            if x != y { return x > y }
+        }
+        return false
     }
 
     // MARK: - caffeinate (lid open)

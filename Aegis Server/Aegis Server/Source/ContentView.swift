@@ -51,6 +51,18 @@ struct ContentView: View {
             Divider()
 
             HStack {
+                Button("Check for Updates") { sys.checkForUpdates() }
+                    .buttonStyle(.plain)
+                    .font(.callout)
+                    .foregroundStyle(.pink)
+                if !sys.updateStatus.isEmpty {
+                    Text(sys.updateStatus)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            HStack {
                 Toggle("Start at Login", isOn: Binding(
                     get: { startAtLogin },
                     set: { on in
