@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-// Runs every shell command (pmset, caffeinate) and publishes the results to the UI.
+// Runs every shell command (pmset, networksetup, caffeinate) and publishes the results to the UI.
 @MainActor
 final class SystemController: ObservableObject {
     @Published var sleepDisabled = false
@@ -9,8 +9,11 @@ final class SystemController: ObservableObject {
     @Published var wifiAlwaysOn = false
     @Published var onBattery = false
     @Published var lastError = ""
+    @Published var lastGuardAction = ""
 
     private var caffeinateProcess: Process?
+    private var watchdogTask: Task<Void, Never>?
+    private var lastCycle = Date.distantPast
 
     // MARK: - pmset toggles (password asked only the first time, then remembered)
 
@@ -31,7 +34,10 @@ final class SystemController: ObservableObject {
                 ok = await runPmset(["-a", "networkoversleep", "1"])
                 if ok { ok = await runPmset(["-a", "tcpkeepalive", "1"]) }
                 if ok { ok = await runPmset(["-a", "powernap", "1"]) }
+                if ok { await ensureNetworksetupPermission() }
+                if ok { startWatchdog() }
             } else {
+                stopWatchdog()
                 ok = await runPmset(["-a", "networkoversleep", "0"])
             }
             lastError = ok ? "" : "Password was cancelled — setting not changed."
@@ -39,21 +45,81 @@ final class SystemController: ObservableObject {
         }
     }
 
+    // MARK: - Wi-Fi watchdog
+
+    // Every few seconds: if Wi-Fi is powered on but has lost its connection,
+    // briefly power-cycle the radio so macOS auto-joins the saved network again.
+    private func startWatchdog() {
+        guard watchdogTask == nil else { return }
+        watchdogTask = Task {
+            while !Task.isCancelled && wifiAlwaysOn {
+                try? await Task.sleep(nanoseconds: 6_000_000_000)
+                guard wifiAlwaysOn else { break }
+                guard Date().timeIntervalSince(lastCycle) > 20 else { continue }
+                await guardOnce()
+            }
+        }
+    }
+
+    private func stopWatchdog() {
+        watchdogTask?.cancel()
+        watchdogTask = nil
+    }
+
+    private func guardOnce() async {
+        let dev = await wifiDevice()
+        let (power, _) = Self.run("/bin/sh", ["-c",
+            "/usr/bin/sudo -n /usr/sbin/networksetup -getairportpower \(dev) 2>/dev/null"])
+        guard power.contains("On") else { return }          // user turned Wi-Fi off themselves
+        let (assoc, code) = Self.run("/bin/sh", ["-c",
+            "/usr/bin/sudo -n /usr/sbin/networksetup -getairportnetwork \(dev) 2>/dev/null"])
+        guard code == 0, !(assoc.contains("not set") || assoc.isEmpty) else { return }  // no permission yet
+        guard !assoc.contains("Current Wi-Fi Network:") || assoc.contains("not set") else { return } // still connected
+        lastCycle = Date()
+        let (_, cycle) = Self.run("/bin/sh", ["-c",
+            "/usr/bin/sudo -n /usr/sbin/networksetup -setairportpower \(dev) off; sleep 2; /usr/bin/sudo -n /usr/sbin/networksetup -setairportpower \(dev) on"])
+        if cycle == 0 {
+            let time = Date().formatted(date: .omitted, time: .shortened)
+            lastGuardAction = "Reconnected Wi-Fi at \(time)"
+        }
+    }
+
+    // Finds which interface (en0, en1...) is the Wi-Fi one on this Mac.
+    private func wifiDevice() async -> String {
+        let (ports, _) = Self.run("/usr/sbin/networksetup", ["-listallhardwareports"])
+        let lines = ports.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+        for (i, line) in lines.enumerated() where line.hasPrefix("Hardware Port: Wi-Fi") {
+            if i + 1 < lines.count, let d = lines[i + 1].split(separator: " ").last { return String(d) }
+        }
+        return "en0"
+    }
+
+    // MARK: - privileged helpers (password asked only the first time, then remembered)
+
     // Runs pmset as root. The first time it asks for the password once and adds a
     // sudoers rule, so every later run is instant and password-free.
     private func runPmset(_ args: [String]) async -> Bool {
         var code = Self.run("/usr/bin/sudo", ["-n", "/usr/bin/pmset"] + args).code
         if code != 0 {
-            let cmd = "echo '%admin ALL=(root) NOPASSWD: /usr/bin/pmset' > /etc/sudoers.d/aegis-server"
-                + " && chmod 0440 /etc/sudoers.d/mimi-server"
-                + " && visudo -cf /etc/sudoers.d/mimi-server"
-            let (_, setup) = Self.run("/usr/bin/osascript",
-                                      ["-e", "do shell script \"\(cmd)\" with administrator privileges"])
-            if setup == 0 {
-                code = Self.run("/usr/bin/sudo", ["-n", "/usr/bin/pmset"] + args).code
-            }
+            await ensurePrivileges()
+            code = Self.run("/usr/bin/sudo", ["-n", "/usr/bin/pmset"] + args).code
         }
         return code == 0
+    }
+
+    // Makes sure the watchdog's networksetup calls are password-free too.
+    private func ensureNetworksetupPermission() async {
+        let probe = Self.run("/usr/bin/sudo", ["-n", "/usr/sbin/networksetup", "-listallhardwareports"])
+        if probe.code != 0 { await ensurePrivileges() }
+    }
+
+    private func ensurePrivileges() async {
+        let cmd = "echo '%admin ALL=(root) NOPASSWD: /usr/bin/pmset' > /etc/sudoers.d/aegis-server"
+            + " && echo '%admin ALL=(root) NOPASSWD: /usr/sbin/networksetup' >> /etc/sudoers.d/aegis-server"
+            + " && chmod 0440 /etc/sudoers.d/aegis-server"
+            + " && visudo -cf /etc/sudoers.d/aegis-server"
+        _ = Self.run("/usr/bin/osascript",
+                     ["-e", "do shell script \"\(cmd)\" with administrator privileges"])
     }
 
     // Reads the real state back from pmset -g so the switches always show the truth.
@@ -70,6 +136,7 @@ final class SystemController: ObservableObject {
         wifiAlwaysOn = isOn("networkoversleep")
         let (batt, _) = Self.run("/usr/bin/pmset", ["-g", "batt"])
         onBattery = !batt.contains("AC Power")
+        if wifiAlwaysOn && watchdogTask == nil { startWatchdog() }
     }
 
     // MARK: - caffeinate (lid open)

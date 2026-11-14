@@ -40,9 +40,13 @@ struct ContentView: View {
 
             option(
                 title: "Keep Wi-Fi connected (lid closed)",
-                help: "Stops Wi-Fi from dropping when the lid is closed.",
+                help: "Stops Wi-Fi from dropping when the lid is closed, and reconnects it automatically if it does.",
                 isOn: Binding(get: { sys.wifiAlwaysOn }, set: { sys.setWifiAlwaysOn($0) }),
                 stateOn: sys.wifiAlwaysOn)
+
+            if !sys.lastGuardAction.isEmpty && sys.wifiAlwaysOn {
+                Text(sys.lastGuardAction).font(.caption2).foregroundStyle(.secondary)
+            }
 
             Divider()
 
