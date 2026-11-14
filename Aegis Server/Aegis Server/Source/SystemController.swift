@@ -11,15 +11,20 @@ final class SystemController: ObservableObject {
     @Published var onBattery = false
     @Published var lastError = ""
     @Published var lastGuardAction = ""
+    @Published var updateStatus = ""
+    @Published var updateAvailable = false
 
     private var caffeinateProcess: Process?
     private var watchdogTask: Task<Void, Never>?
     private var lastCycle = Date.distantPast
 
-    // Checks GitHub for a newer release shortly after launch, so the answer is
-    // ready when the user opens the menu. Never opens anything by itself.
+    // On launch: adopt a caffeinate that survived a restart, and quietly check GitHub
+    // for a newer release so the answer is ready when the user opens the menu.
     init() {
+        UserDefaults.standard.removeObject(forKey: "updating")   // finished an update restart
         Task { [weak self] in
+            if let pid = UserDefaults.standard.object(forKey: "caffeinatePID") as? Int32,
+               kill(pid, 0) == 0 { self?.lidAwake = true }
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             await self?.checkForUpdates(autoOpen: false)
         }
@@ -151,14 +156,11 @@ final class SystemController: ObservableObject {
         if wifiAlwaysOn && watchdogTask == nil { startWatchdog() }
     }
 
-    // MARK: - Updates (network is used only when the user clicks the button)
-
-    @Published var updateStatus = ""
-    @Published var updateAvailable = false
+    // MARK: - Updates (network is used only when the user asks, or the quiet launch check)
 
     func checkForUpdates(autoOpen: Bool = true) {
         Task {
-            updateStatus = "Checking…"
+            updateStatus = updateAvailable ? updateStatus : "Checking…"
             let url = URL(string: "https://api.github.com/repos/devygram/aegis-server/releases/latest")!
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
@@ -200,6 +202,59 @@ final class SystemController: ObservableObject {
         return false
     }
 
+    // One-click update: downloads the new DMG, replaces the app in /Applications,
+    // and relaunches — all by itself.
+    func installUpdate() {
+        Task {
+            do {
+                updateStatus = "Downloading update…"
+                let api = URL(string: "https://api.github.com/repos/devygram/aegis-server/releases/latest")!
+                let (data, _) = try await URLSession.shared.data(from: api)
+                let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let assets = obj?["assets"] as? [[String: Any]] ?? []
+                guard let dmg = assets.first(where: { ($0["name"] as? String)?.hasSuffix(".dmg") == true }),
+                      let link = dmg["browser_download_url"] as? String else {
+                    updateStatus = "Download link not found."
+                    return
+                }
+                let dmgURL = URL(fileURLWithPath: "/tmp/aegis-update.dmg")
+                try? FileManager.default.removeItem(at: dmgURL)
+                let (file, _) = try await URLSession.shared.data(from: URL(string: link)!)
+                try file.write(to: dmgURL)
+
+                updateStatus = "Installing…"
+                let (mountOut, code) = Self.run("/usr/bin/hdiutil",
+                                                ["attach", dmgURL.path, "-nobrowse", "-readonly"])
+                guard code == 0, let v = mountOut.range(of: "/Volumes/") else {
+                    updateStatus = "Could not mount the download."
+                    return
+                }
+                let vol = String(mountOut[v.lowerBound...].prefix(while: { $0 != "\n" && $0 != "\t" }))
+                let src = vol + "/Aegis Server.app"
+                let dst = "/Applications/Aegis Server.app"
+                let old = "/tmp/Aegis Server.old"
+                try? FileManager.default.removeItem(atPath: old)
+                try FileManager.default.moveItem(atPath: dst, toPath: old)
+                do {
+                    try FileManager.default.copyItem(atPath: src, toPath: dst)
+                } catch {
+                    try? FileManager.default.moveItem(atPath: old, toPath: dst)   // put the old app back
+                    throw error
+                }
+                Self.run("/usr/bin/hdiutil", ["detach", vol, "-quiet"])
+                try? FileManager.default.removeItem(at: dmgURL)
+                try? FileManager.default.removeItem(atPath: old)
+
+                updateStatus = "Restarting…"
+                UserDefaults.standard.set(true, forKey: "updating")   // keep settings across the restart
+                Self.run("/bin/sh", ["-c", "sleep 1; /usr/bin/open \"\(dst)\" >/dev/null 2>&1 &"])
+                NSApp.terminate(nil)
+            } catch {
+                updateStatus = "Update failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
     // MARK: - caffeinate (lid open)
 
     func setLidAwake(_ on: Bool) {
@@ -214,25 +269,38 @@ final class SystemController: ObservableObject {
                     await refreshStatus()
                 }
             }
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
-            p.arguments = ["-i"]
-            do {
-                try p.run(); caffeinateProcess = p; lastError = ""
-                UserDefaults.standard.set(p.processIdentifier, forKey: "caffeinatePID")
-            }
-            catch { lastError = "Could not start caffeinate: \(error.localizedDescription)" }
+            startCaffeinate()
         } else {
-            caffeinateProcess?.terminate()
-            caffeinateProcess = nil
-            UserDefaults.standard.removeObject(forKey: "caffeinatePID")
+            stopCaffeinate()
         }
+    }
+
+    private func startCaffeinate() {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
+        p.arguments = ["-i"]
+        do {
+            try p.run(); caffeinateProcess = p; lastError = ""
+            UserDefaults.standard.set(p.processIdentifier, forKey: "caffeinatePID")
+        }
+        catch { lastError = "Could not start caffeinate: \(error.localizedDescription)" }
+    }
+
+    private func stopCaffeinate() {
+        caffeinateProcess?.terminate()
+        caffeinateProcess = nil
+        if let pid = UserDefaults.standard.object(forKey: "caffeinatePID") as? Int32 {
+            kill(pid, SIGTERM)
+        }
+        UserDefaults.standard.removeObject(forKey: "caffeinatePID")
     }
 
     // Called on quit: releases the sleep/Wi-Fi state that is currently on —
     // checked against the real system, so settings can never outlive the app.
+    // Skipped during an update restart, so the user's setup survives the update.
     nonisolated static func cleanupOnQuit() {
         let d = UserDefaults.standard
+        if d.bool(forKey: "updating") { return }
         let (out, _) = run("/usr/bin/pmset", ["-g"])
         func isOn(_ key: String) -> Bool {
             guard let line = out.split(separator: "\n").first(where: {

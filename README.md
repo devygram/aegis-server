@@ -60,6 +60,11 @@ Or just open `Aegis Server.xcodeproj` in Xcode and press ⌘R.
 - [ ] Battery indicator inside the window
 - [ ] Optional "keep awake until" timer
 
+## Updates
+
+The app checks GitHub quietly at launch. When a new version appears, the button turns green — **"Update Now"** — and one click downloads, installs and restarts the app by itself. No browser, no DMG dragging.
+(The only network requests the app ever makes are the update check and download, and the download only happens when you click **Update Now**.)
+
 ## Privacy
 
 The app **never** connects to the internet on its own and never collects anything — everything runs locally on your Mac.
