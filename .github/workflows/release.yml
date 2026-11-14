@@ -19,15 +19,25 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Zip the app
+      - name: Make DMG
         run: |
-          cd build/Build/Products/Release
-          ditto -c -k --keepParent "Aegis Server.app" Aegis-Server.zip
-          mkdir -p "$GITHUB_WORKSPACE/dist"
-          mv Aegis-Server.zip "$GITHUB_WORKSPACE/dist/"
+          brew install create-dmg
+          mkdir -p stage dist
+          cp -R "build/Build/Products/Release/Aegis Server.app" stage/
+          create-dmg \
+            --volname "Aegis Server" \
+            --icon "Aegis Server.app" 160 200 \
+            --app-drop-link 400 200 \
+            --window-size 560 400 \
+            --hide-extension "Aegis Server.app" \
+            "dist/Aegis-Server.dmg" \
+            "stage/" || true
+          # fallback: plain DMG if the fancy layout step failed on the headless runner
+          [ -f "dist/Aegis-Server.dmg" ] || \
+            hdiutil create -volname "Aegis Server" -srcfolder stage -ov -format UDZO "dist/Aegis-Server.dmg"
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/Aegis-Server.zip
+          files: dist/Aegis-Server.dmg
           generate_release_notes: true

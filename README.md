@@ -23,14 +23,15 @@ Extra niceties:
 
 ## Install (no Xcode needed)
 
-1. Grab `Aegis-Server.zip` from the [Releases](../../releases) page and unzip it.
-2. Drag **Aegis Server.app** into **Applications**.
-3. First launch: if macOS blocks it ("cannot be opened"), run this in Terminal or right-click → **Open**:
+1. Grab `Aegis-Server.dmg` from the [Releases](../../releases) page and open it.
+2. In the window that opens, **drag Aegis Server.app onto the Applications folder**.
+3. Eject the disk image (it appears in the sidebar / on your desktop).
+4. First launch: if macOS blocks it ("cannot be opened"), run this in Terminal or right-click → **Open**:
    ```bash
    xattr -cr "/Applications/Aegis Server.app"
    ```
    (The app is not notarized yet — this just clears the Gatekeeper flag. The app has no network access to any outside server.)
-4. Click the 🛡 icon in the menu bar, flip the switches, done.
+5. Click the 🛡 icon in the menu bar, flip the switches, done.
 
 ## Build it yourself
 
