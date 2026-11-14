@@ -16,6 +16,15 @@ final class SystemController: ObservableObject {
     private var watchdogTask: Task<Void, Never>?
     private var lastCycle = Date.distantPast
 
+    // Checks GitHub for a newer release shortly after launch, so the answer is
+    // ready when the user opens the menu. Never opens anything by itself.
+    init() {
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            await self?.checkForUpdates(autoOpen: false)
+        }
+    }
+
     // MARK: - pmset toggles (password asked only the first time, then remembered)
 
     func setSleepDisabled(_ on: Bool) {
@@ -144,7 +153,7 @@ final class SystemController: ObservableObject {
 
     @Published var updateStatus = ""
 
-    func checkForUpdates() {
+    func checkForUpdates(autoOpen: Bool = true) {
         Task {
             updateStatus = "Checking…"
             let url = URL(string: "https://api.github.com/repos/devygram/aegis-server/releases/latest")!
@@ -157,8 +166,12 @@ final class SystemController: ObservableObject {
                 }
                 let current = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
                 if isNewer(tag, than: current) {
-                    updateStatus = "New version \(tag) — opening the download page…"
-                    NSWorkspace.shared.open(URL(string: html)!)
+                    if autoOpen {
+                        updateStatus = "New version \(tag) — opening the download page…"
+                        NSWorkspace.shared.open(URL(string: html)!)
+                    } else {
+                        updateStatus = "Update available: \(tag) — click Check for Updates"
+                    }
                 } else {
                     updateStatus = "You're up to date (v\(current))."
                 }

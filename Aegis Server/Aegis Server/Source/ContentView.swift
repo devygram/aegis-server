@@ -50,8 +50,6 @@ struct ContentView: View {
 
             Divider()
 
-            Divider()
-
             HStack {
                 Button("Check for Updates") { sys.checkForUpdates() }
                     .buttonStyle(.plain)
