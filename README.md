@@ -1,75 +1,45 @@
 # Aegis Server 🛡✨
 
-A tiny macOS menu bar app that turns your Mac into an always-on machine — even with the **lid closed**.
+Keep your Mac awake — even with the **lid closed**.
 
-Close the lid, walk away, and your Mac keeps running with Wi-Fi alive: perfect for running servers, downloads, automations, or long tasks overnight.
+Aegis Server lives quietly in your menu bar and lets your Mac keep running after you close the lid: perfect for servers, downloads, automations, or long tasks overnight. No Terminal, no settings spelunking — just a switch.
 
-![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-black) ![Swift](https://img.shields.io/badge/Swift-SwiftUI-orange) ![License](https://img.shields.io/badge/license-MIT-green)
+![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-black) ![Swift](https://img.shields.io/badge/SwiftUI-orange) ![License](https://img.shields.io/badge/license-MIT-green)
 
-## What it does
+## Why
 
-| Switch | What it does | Command used |
-|---|---|---|
-| **Keep Mac Awake (lid open)** | Prevents idle sleep while you're working | `caffeinate -i` (runs in background) |
-| **Keep Mac Awake (lid closed)** | The Mac keeps running after you close the lid | `pmset -a disablesleep 1` |
-| **Keep Wi-Fi connected (lid closed)** | Stops Wi-Fi from dropping when the lid closes | `pmset -a networkoversleep 1` + `tcpkeepalive 1` + `powernap 1` |
+macOS is designed to sleep when you close the lid — great for battery, terrible when you're hosting something or letting a big job run overnight. Aegis Server flips the switch Apple buried, with a safety net built in.
 
-Extra niceties:
+## What you get
 
-- **The two awake modes are mutually exclusive** — the app keeps them from fighting each other.
-- **Password is asked only once** — the first time, the app registers a sudoers rule for `pmset`; after that every switch is instant. Your password is never seen or stored by the app (it's the standard macOS admin prompt).
-- **Battery warning** — if lid-closed mode is on while running on battery, the app warns you.
-- **Start at Login** built in, plus the real state is read back from `pmset -g` so the switches always show the truth.
+- 🌙 **Keep awake with the lid closed** — close the lid, walk away, the Mac keeps running
+- 💻 **Keep awake while you work** — no idle sleep while the lid is open
+- 📶 **Wi-Fi watchdog** — if Wi-Fi drops while the lid is closed, the app reconnects it automatically
+- 🔋 **Battery-aware** — warns you before lid-closed mode drains your battery
+- 🚀 **Start at Login** — set it once and forget it
+- ✅ **Honest switches** — the toggles always show the *real* system state, read straight back from macOS
 
-## Install (no Xcode needed)
+## Install
 
-1. Grab `Aegis-Server.dmg` from the [Releases](../../releases) page and open it.
-2. In the window that opens, **drag Aegis Server.app onto the Applications folder**.
-3. Eject the disk image (it appears in the sidebar / on your desktop).
-4. First launch: if macOS blocks it ("cannot be opened"), run this in Terminal or right-click → **Open**:
-   ```bash
-   xattr -cr "/Applications/Aegis Server.app"
-   ```
-   (The app is not notarized yet — this just clears the Gatekeeper flag. The app has no network access to any outside server.)
-5. Click the 🛡 icon in the menu bar, flip the switches, done.
+1. Download **Aegis-Server.dmg** from the [latest release](../../releases).
+2. Open it and **drag Aegis Server into Applications**.
+3. Launch it — a 🛡 icon appears in your menu bar. Flip the switches, done.
 
-## Build it yourself
+> **First launch only:** if macOS says the app "cannot be opened" because it can't verify the developer, right-click (or Control-click) the app in Applications and choose **Open**, then confirm. It will open normally from then on. This happens because the app isn't signed with a paid developer certificate — it's normal for open-source Mac apps, and the app makes no internet connections of its own.
 
-Requires **macOS 13+** and **Xcode**.
+## Good to know
 
-```bash
-git clone https://github.com/devygram/aegis-server.git
-cd aegis-server/Aegis\ Server
-xcodebuild -project "Aegis Server.xcodeproj" -scheme "Aegis Server" -configuration Release build
-# the app appears in:
-# ~/Library/Developer/Xcode/DerivedData/Aegis_Server-*/Build/Products/Release/
-```
-
-Or just open `Aegis Server.xcodeproj` in Xcode and press ⌘R.
-
-## ⚠️ Warnings — please read
-
-- **Battery drain:** lid-closed mode keeps the *whole machine* awake. On battery, that will drain it quickly and a closed machine can get warm. The app warns you when you're on battery — plug in for long sessions.
-- **Wi-Fi mode is best-effort:** the real mechanism keeping Wi-Fi alive is preventing sleep (`disablesleep`). The Wi-Fi switch adds power-management settings on top; a few Macs/router combos may still drop Wi-Fi.
-- **What "disablesleep" means:** your Mac will not sleep even if you *want* it to, until you flip the switch off. It also survives reboots (it's a persistent system setting) — the app re-checks and shows the true state on launch.
-- The app changes **system power settings**; no data is destroyed. Turning a switch off restores the previous value — and **quitting the app releases everything it set**, so a kept-awake Mac goes back to normal sleep when the app is gone (keep the app running, or enable Start at Login, for the awake state to persist).
-
-## Roadmap
-
-- [x] v1.1: Wi-Fi watchdog — auto-reconnect if Wi-Fi drops while the lid is closed
-- [x] v1.3: green "Update Now" button when a new release is out
-- [x] v1.4: one-click self-update (download → install → relaunch)
-- [ ] Optional "keep awake until" timer
-
-## Updates
-
-The app checks GitHub quietly at launch. When a new version appears, the button turns green — **"Update Now"** — and one click downloads, installs and restarts the app by itself. No browser, no DMG dragging.
-(The only network requests the app ever makes are the update check and download, and the download only happens when you click **Update Now**.)
+- The first time you turn on a switch, macOS asks for your **admin password once** — that's the standard macOS prompt; the app never sees or stores your password.
+- **Quitting the app releases everything it changed.** App running = Mac stays awake. App quit = back to normal sleep behavior. Nothing is left behind.
+- With the lid closed and the Mac awake, it can get warm — plug in for long sessions.
 
 ## Privacy
 
-The app **never** connects to the internet on its own and never collects anything — everything runs locally on your Mac.
-The only network requests it ever makes are the update check at launch and the download when **you** click **Update Now**.
+Aegis Server runs entirely on your Mac. It never sends anything anywhere and collects nothing. The only network activity is an occasional, quiet check for new versions — and downloads happen only when you click **Update Now**.
+
+## Updates
+
+The app checks for new versions on its own. When one is available, the button turns green — **Update Now** — and one click installs it and relaunches the app. No downloads, no reinstalling.
 
 ## License
 
