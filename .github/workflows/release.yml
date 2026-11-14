@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (Release, unsigned)
+        run: |
+          xcodebuild -project "Aegis Server/Aegis Server.xcodeproj" \
+            -scheme "Aegis Server" \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Zip the app
+        run: |
+          cd build/Build/Products/Release
+          ditto -c -k --keepParent "Aegis Server.app" Aegis-Server.zip
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          mv Aegis-Server.zip "$GITHUB_WORKSPACE/dist/"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Aegis-Server.zip
+          generate_release_notes: true
