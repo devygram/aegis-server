@@ -31,6 +31,7 @@ final class SystemController: ObservableObject {
         Task {
             if on { setLidAwake(false) }   // the two awake modes are exclusive
             let ok = await runPmset(["-a", "disablesleep", on ? "1" : "0"])
+            if ok { UserDefaults.standard.set(on, forKey: "sleepSet") }
             lastError = ok ? "" : "Password was cancelled — setting not changed."
             await refreshStatus()
         }
@@ -51,6 +52,7 @@ final class SystemController: ObservableObject {
                 ok = await runPmset(["-a", "networkoversleep", "0"])
             }
             lastError = ok ? "" : "Password was cancelled — setting not changed."
+            if ok { UserDefaults.standard.set(on, forKey: "wifiSet") }
             await refreshStatus()
         }
     }
@@ -212,11 +214,33 @@ final class SystemController: ObservableObject {
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
             p.arguments = ["-i"]
-            do { try p.run(); caffeinateProcess = p; lastError = "" }
+            do {
+                try p.run(); caffeinateProcess = p; lastError = ""
+                UserDefaults.standard.set(p.processIdentifier, forKey: "caffeinatePID")
+            }
             catch { lastError = "Could not start caffeinate: \(error.localizedDescription)" }
         } else {
             caffeinateProcess?.terminate()
             caffeinateProcess = nil
+            UserDefaults.standard.removeObject(forKey: "caffeinatePID")
+        }
+    }
+
+    // Called on quit: undoes every system change the app is responsible for,
+    // so a Mac that was kept awake goes back to normal sleep behavior.
+    nonisolated static func cleanupOnQuit() {
+        let d = UserDefaults.standard
+        if d.bool(forKey: "sleepSet") {
+            _ = run("/usr/bin/sudo", ["-n", "/usr/bin/pmset", "-a", "disablesleep", "0"])
+            d.removeObject(forKey: "sleepSet")
+        }
+        if d.bool(forKey: "wifiSet") {
+            _ = run("/usr/bin/sudo", ["-n", "/usr/bin/pmset", "-a", "networkoversleep", "0"])
+            d.removeObject(forKey: "wifiSet")
+        }
+        if let pid = d.object(forKey: "caffeinatePID") as? Int32 {
+            kill(pid, SIGTERM)
+            d.removeObject(forKey: "caffeinatePID")
         }
     }
 

@@ -52,7 +52,7 @@ Or just open `Aegis Server.xcodeproj` in Xcode and press ⌘R.
 - **Battery drain:** lid-closed mode keeps the *whole machine* awake. On battery, that will drain it quickly and a closed machine can get warm. The app warns you when you're on battery — plug in for long sessions.
 - **Wi-Fi mode is best-effort:** the real mechanism keeping Wi-Fi alive is preventing sleep (`disablesleep`). The Wi-Fi switch adds power-management settings on top; a few Macs/router combos may still drop Wi-Fi.
 - **What "disablesleep" means:** your Mac will not sleep even if you *want* it to, until you flip the switch off. It also survives reboots (it's a persistent system setting) — the app re-checks and shows the true state on launch.
-- The app changes **system power settings**; no data is destroyed, and turning a switch off restores the previous value.
+- The app changes **system power settings**; no data is destroyed. Turning a switch off restores the previous value — and **quitting the app releases everything it set**, so a kept-awake Mac goes back to normal sleep when the app is gone (keep the app running, or enable Start at Login, for the awake state to persist).
 
 ## Roadmap
 
